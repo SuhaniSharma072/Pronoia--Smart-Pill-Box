@@ -1,0 +1,273 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <time.h>
+
+//REMOVED MY WIFI INFORMATION  
+const char* ssid         = "  ";  //removed for privacy reasons
+const char* password     = "   ";  //removed for privacy
+const char* firebaseHost = "https://argyletech-9e536-default-rtdb.firebaseio.com";
+
+const int REED_PIN   = 2;   
+const int BUZZER_PIN = 1;   
+const int WINDOW_MINUTES = 2;
+
+int reminderHour1   = 22;
+int reminderMinute1 = 0;
+int reminderHour2   = 22;
+int reminderMinute2 = 0;
+
+bool alreadyRang1 = false;
+bool alreadyRang2 = false;
+
+const int QUARTER_MS = 350;
+const int NOTE_C = 262, NOTE_D = 294, NOTE_E = 330,
+          NOTE_F = 349, NOTE_G = 392, NOTE_A = 440;
+
+const int melody[]    = { NOTE_C, NOTE_C, NOTE_G, NOTE_G, NOTE_A, NOTE_A, NOTE_G,
+                          NOTE_F, NOTE_F, NOTE_E, NOTE_E, NOTE_D, NOTE_D, NOTE_C };
+const int durations[] = { 1, 1, 1, 1, 1, 1, 2,
+                          1, 1, 1, 1, 1, 1, 2 };
+const int NOTE_COUNT  = sizeof(melody) / sizeof(melody[0]);
+
+unsigned long lastScheduleFetch = 0;
+const unsigned long scheduleFetchInterval = 30000;  
+unsigned long lastSlowCheck = 0;
+const unsigned long slowCheckInterval = 2000;       
+unsigned long lastLidSend = 0;
+const unsigned long lidHeartbeat = 10000;          
+
+int lastLidState = -1;   
+
+bool windowActive = false;
+int  windowSlot = 0;
+int  windowHour = 0, windowMinute = 0;
+unsigned long windowStartMs = 0;
+bool sawClosedSinceStart = false;
+
+bool lidClosed() {
+  return digitalRead(REED_PIN) == LOW;
+}
+
+void playBuzzer() {
+  for (int i = 0; i < NOTE_COUNT; i++) {
+    int d = durations[i] * QUARTER_MS;
+    tone(BUZZER_PIN, melody[i]);
+    delay(d * 0.9);
+    noTone(BUZZER_PIN);
+    delay(d * 0.1);
+  }
+  noTone(BUZZER_PIN);
+}
+
+String hhmm(int h, int m) {
+  char buf[6];
+  snprintf(buf, sizeof(buf), "%02d:%02d", h, m);
+  return String(buf);
+}
+
+String nowHHMM() {
+  struct tm t;
+  if (!getLocalTime(&t)) return "--:--";
+  return hhmm(t.tm_hour, t.tm_min);
+}
+
+void firebaseWrite(const String& path, const String& json, bool push) {
+  if (WiFi.status() != WL_CONNECTED) return;
+  HTTPClient http;
+  http.begin(String(firebaseHost) + path + ".json");
+  http.addHeader("Content-Type", "application/json");
+  int code = push ? http.POST(json) : http.PUT(json);
+  Serial.printf("Firebase %s %s -> %d\n", push ? "POST" : "PUT", path.c_str(), code);
+  http.end();
+}
+
+void sendLidToFirebase(const char* status) {
+  firebaseWrite("/lidStatus", String("\"") + status + "\"", false);
+}
+
+void reportDose(const char* state) {
+  String scheduled = hhmm(windowHour, windowMinute);
+  String json = "{\"slot\":" + String(windowSlot) +
+                ",\"scheduled\":\"" + scheduled + "\"" +
+                ",\"state\":\"" + state + "\"";
+  if (String(state) == "opened") {
+    json += ",\"openedAt\":\"" + nowHHMM() + "\"";
+  }
+  json += ",\"ts\":" + String((unsigned long)time(nullptr)) + "}";
+
+  firebaseWrite("/doseStatus", json, false);  // latest status
+  firebaseWrite("/doseLog", json, true);      // history
+}
+
+void startWindow(int slot, int h, int m) {
+  windowActive  = true;
+  windowSlot    = slot;
+  windowHour    = h;
+  windowMinute  = m;
+  windowStartMs = millis();
+  sawClosedSinceStart = lidClosed();   // lid must be closed, then open
+  Serial.println("DOSE: window started for " + hhmm(h, m));
+  reportDose("waiting");
+}
+
+void updateDoseWindow() {
+  if (!windowActive) return;
+
+  if (lidClosed()) {
+    sawClosedSinceStart = true;
+  } else if (sawClosedSinceStart) {
+    Serial.println("DOSE: lid opened at " + nowHHMM());
+    reportDose("opened");
+    windowActive = false;
+    return;
+  }
+
+  if (millis() - windowStartMs >= (unsigned long)WINDOW_MINUTES * 60UL * 1000UL) {
+    Serial.println("DOSE: window ended, lid never opened");
+    reportDose("missed");
+    windowActive = false;
+  }
+}
+void fetchReminderSchedule() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(String(firebaseHost) + "/reminders.json");
+  int code = http.GET();
+
+  if (code == 200) {
+    String payload = http.getString();
+    if (payload != "null") {
+      StaticJsonDocument<256> doc;
+      if (!deserializeJson(doc, payload)) {
+        int h1 = doc["hour1"]   | reminderHour1;
+        int m1 = doc["minute1"] | reminderMinute1;
+        int h2 = doc["hour2"]   | reminderHour2;
+        int m2 = doc["minute2"] | reminderMinute2;
+        if (h1 != reminderHour1 || m1 != reminderMinute1 ||
+            h2 != reminderHour2 || m2 != reminderMinute2) {
+          reminderHour1 = h1; reminderMinute1 = m1;
+          reminderHour2 = h2; reminderMinute2 = m2;
+          Serial.printf("Schedule updated: %02d:%02d and %02d:%02d\n",
+                        h1, m1, h2, m2);
+        }
+      } else {
+        Serial.println("Failed to parse reminder schedule JSON");
+      }
+    }
+  } else {
+    Serial.printf("Reminder fetch failed, HTTP code: %d\n", code);
+  }
+  http.end();
+}
+
+void checkRemoteTrigger() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  String url = String(firebaseHost) + "/remoteTrigger.json";
+  http.begin(url);
+  int code = http.GET();
+
+  if (code == 200 && http.getString() == "true") {
+    http.end();
+    Serial.println("REMOTE TRIGGER: playing sound");
+    playBuzzer();
+
+    HTTPClient reset;
+    reset.begin(url);
+    reset.addHeader("Content-Type", "application/json");
+    reset.PUT("false");
+    reset.end();
+    return;
+  }
+  http.end();
+}
+void checkReminders() {
+  struct tm t;
+  if (!getLocalTime(&t)) return;
+
+  int h = t.tm_hour, m = t.tm_min;
+  bool sameTime = (reminderHour1 == reminderHour2 && reminderMinute1 == reminderMinute2);
+
+  if (h == reminderHour1 && m == reminderMinute1) {
+    if (!alreadyRang1) {
+      alreadyRang1 = true;
+      Serial.println("REMINDER 1: playing sound");
+      startWindow(1, reminderHour1, reminderMinute1);
+      playBuzzer();
+    }
+  } else {
+    alreadyRang1 = false;
+  }
+
+  if (!sameTime && h == reminderHour2 && m == reminderMinute2) {
+    if (!alreadyRang2) {
+      alreadyRang2 = true;
+      Serial.println("REMINDER 2: playing sound");
+      startWindow(2, reminderHour2, reminderMinute2);
+      playBuzzer();
+    }
+  } else {
+    alreadyRang2 = false;
+  }
+}
+
+void connectWiFi() {
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+  Serial.println("Connected!");
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(REED_PIN, INPUT_PULLUP);
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  connectWiFi();
+
+  configTzTime("CST6CDT,M3.2.0,M11.1.0", "pool.ntp.org");
+  Serial.println("Syncing time...");
+  delay(2000);
+
+  fetchReminderSchedule();
+}
+
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    WiFi.reconnect();
+    delay(1000);
+    return;
+  }
+
+  int lid = lidClosed() ? 1 : 0;
+  if (lid != lastLidState || millis() - lastLidSend > lidHeartbeat) {
+    if (lid != lastLidState) {
+      Serial.println(lid ? "CLOSED - magnet detected" : "OPEN - no magnet");
+    }
+    sendLidToFirebase(lid ? "closed" : "open");
+    lastLidState = lid;
+    lastLidSend = millis();
+  }
+
+  updateDoseWindow();
+
+  if (millis() - lastScheduleFetch > scheduleFetchInterval) {
+    fetchReminderSchedule();
+    lastScheduleFetch = millis();
+  }
+
+  if (millis() - lastSlowCheck > slowCheckInterval) {
+    checkRemoteTrigger();
+    checkReminders();
+    lastSlowCheck = millis();
+  }
+
+  delay(50);
+}
