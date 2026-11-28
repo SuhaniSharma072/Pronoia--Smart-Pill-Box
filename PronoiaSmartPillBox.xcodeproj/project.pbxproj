@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4CD8A06B303B838C00A812FA /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4CD8A06A303B838C00A812FA /* FirebaseAuth */; };
+		4CD8A06D303B83A200A812FA /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 4CD8A06C303B83A200A812FA /* FirebaseFirestore */; };
+		4CD8A06F303B83AD00A812FA /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 4CD8A06E303B83AD00A812FA /* FirebaseDatabase */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4CD89FF7303B743C00A812FA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +58,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4CD8A06F303B83AD00A812FA /* FirebaseDatabase in Frameworks */,
+				4CD8A06B303B838C00A812FA /* FirebaseAuth in Frameworks */,
+				4CD8A06D303B83A200A812FA /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +87,7 @@
 				4CD89FE9303B743B00A812FA /* PronoiaSmartPillBox */,
 				4CD89FF9303B743C00A812FA /* PronoiaSmartPillBoxTests */,
 				4CD8A003303B743C00A812FA /* PronoiaSmartPillBoxUITests */,
+				4CD8A069303B838C00A812FA /* Frameworks */,
 				4CD89FE8303B743B00A812FA /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +100,13 @@
 				4CD8A000303B743C00A812FA /* PronoiaSmartPillBoxUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4CD8A069303B838C00A812FA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +129,9 @@
 			);
 			name = PronoiaSmartPillBox;
 			packageProductDependencies = (
+				4CD8A06A303B838C00A812FA /* FirebaseAuth */,
+				4CD8A06C303B83A200A812FA /* FirebaseFirestore */,
+				4CD8A06E303B83AD00A812FA /* FirebaseDatabase */,
 			);
 			productName = PronoiaSmartPillBox;
 			productReference = 4CD89FE7303B743B00A812FA /* PronoiaSmartPillBox.app */;
@@ -195,6 +215,9 @@
 			);
 			mainGroup = 4CD89FDE303B743B00A812FA;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4CD8A068303B813E00A812FA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4CD89FE8303B743B00A812FA /* Products */;
 			projectDirPath = "";
@@ -395,6 +418,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A864749CXG;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -426,6 +450,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A864749CXG;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -570,6 +595,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4CD8A068303B813E00A812FA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.18.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4CD8A06A303B838C00A812FA /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4CD8A068303B813E00A812FA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		4CD8A06C303B83A200A812FA /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4CD8A068303B813E00A812FA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		4CD8A06E303B83AD00A812FA /* FirebaseDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4CD8A068303B813E00A812FA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4CD89FDF303B743B00A812FA /* Project object */;
 }

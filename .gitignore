@@ -1,0 +1,14 @@
+# Secrets - never upload
+GoogleService-Info.plist
+
+# Old zip copy
+Archive.zip
+
+# Mac junk
+.DS_Store
+
+# Xcode personal/build files
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate

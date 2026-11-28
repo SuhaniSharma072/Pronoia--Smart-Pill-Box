@@ -3,59 +3,79 @@
 //  PronoiaSmartPillBox
 //
 //  Created by Suhani Sharmaa on 8/23/26.
+
+//  ArgyleTech//  ArgyleTech
 //
-
 import SwiftUI
-import SwiftData
-
+import FirebaseAuth
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    @StateObject private var firebase = FirebaseManager.shared
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        Group {
+            if firebase.isLoggedIn {
+                if let user = firebase.currentUser {
+                    if user.isOlderAdult {
+                        ElderTabView()
+                    } else {
+                        CaretakerTabView()
                     }
+                } else if firebase.profileFetchFailed {
+                    ProfileErrorView()
+                } else {
+                    LoadingView()
                 }
-                .onDelete(perform: deleteItems)
+            } else {
+                SplashView()
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
         }
+        .animation(.easeInOut(duration: 0.3), value: firebase.isLoggedIn)
     }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+}
+struct ProfileErrorView: View {
+    @StateObject private var firebase = FirebaseManager.shared
+    var body: some View {
+        ZStack {
+            Color.appBackground.ignoresSafeArea()
+            VStack(spacing: 20) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 40))
+                    .foregroundColor(.orange)
+                Text("Couldn't load your profile")
+                    .font(.appBodyBold(AppFont.bodyMedium))
+                    .foregroundColor(.darkText)
+                Text("This account signed in, but no profile data was found for it. Check the Xcode console for details.")
+                    .font(.appCaption())
+                    .foregroundColor(.grayText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                Button("Sign Out") {
+                    try? firebase.auth.signOut()
+                }
+                .font(.appButton(AppFont.bodyMedium))
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color.mintDark)
+                .cornerRadius(12)
             }
         }
     }
 }
-
+struct LoadingView: View {
+    var body: some View {
+        ZStack {
+            Color.appBackground.ignoresSafeArea()
+            VStack(spacing: 20) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .mintDark))
+                    .scaleEffect(1.4)
+                Text("Loading...")
+                    .font(.appBody(AppFont.bodyMedium))
+                    .foregroundColor(.grayText)
+            }
+        }
+    }
+}
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
